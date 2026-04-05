@@ -56,7 +56,8 @@ ids_system/
 
 ---
 
-## Dataset Compatibility
+## Dataset Compatibility 
+sumber dataset : https://drive.google.com/file/d/1BG70vkXPe70mhn0Z9dE0ibxk4Qa2Kbwk/view?usp=sharing
 - CICIDS 2017 (all variants)
 - Supports column names: `Tot Fwd Pkts` / `Total Fwd Packets`
 - Supports IP columns: `Src IP` / `Source IP`
