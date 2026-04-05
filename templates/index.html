@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL IDS — Intrusion Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #030b14;
+    --bg2: #061220;
+    --bg3: #091929;
+    --panel: #0a1f35;
+    --border: #0e3a5e;
+    --accent: #00d4ff;
+    --accent2: #00ff99;
+    --danger: #ff3366;
+    --warn: #ffaa00;
+    --text: #c8e8f8;
+    --muted: #4a7a9b;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+    --cond: 'Barlow Condensed', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* SCANLINE EFFECT */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .app { position: relative; z-index: 2; }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,20,40,0.95) 0%, transparent 100%);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 42px;
+    height: 42px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .logo-icon::before {
+    content: '';
+    position: absolute;
+    width: 200%;
+    height: 4px;
+    background: var(--accent);
+    animation: scan 2s linear infinite;
+    opacity: 0.5;
+  }
+
+  @keyframes scan {
+    from { top: -10px; }
+    to { top: 110%; }
+  }
+
+  .logo-icon svg { width: 22px; height: 22px; fill: var(--accent); }
+
+  .logo h1 {
+    font-family: var(--cond);
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo p {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .dot.active { background: var(--accent2); animation: pulse 1.5s ease infinite; }
+  .dot.danger { background: var(--danger); animation: pulse 0.8s ease infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* NAV TABS */
+  nav {
+    display: flex;
+    gap: 2px;
+    padding: 0 32px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 24px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+  }
+
+  .tab-btn:hover { color: var(--text); }
+
+  .tab-btn.active {
+    color: var(--accent);
+  }
+
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* MAIN CONTENT */
+  main {
+    padding: 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.4;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-title::before {
+    content: '//';
+    color: var(--muted);
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  /* STAT CARDS */
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 400;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-val.accent { color: var(--accent); }
+  .stat-val.success { color: var(--accent2); }
+  .stat-val.danger { color: var(--danger); }
+  .stat-val.warn { color: var(--warn); }
+
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 4px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.3s;
+  }
+
+  .upload-zone:hover .upload-icon { border-color: var(--accent); }
+
+  .upload-icon svg { width: 28px; height: 28px; stroke: var(--muted); }
+
+  .upload-zone h3 {
+    font-family: var(--cond);
+    font-size: 22px;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .upload-zone p {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* BUTTONS */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 28px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,212,255,0.2);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+  }
+
+  .btn-primary:hover {
+    background: #00b8d9;
+    border-color: #00b8d9;
+    color: var(--bg);
+    box-shadow: 0 0 20px rgba(0,212,255,0.4);
+  }
+
+  .btn-danger {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover {
+    background: var(--danger);
+    color: white;
+    box-shadow: 0 0 12px rgba(255,51,102,0.4);
+  }
+
+  /* PROGRESS BAR */
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* LOG TERMINAL */
+  .terminal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+    height: 180px;
+    overflow-y: auto;
+    color: var(--accent2);
+  }
+
+  .terminal .log-line { display: block; }
+  .terminal .log-time { color: var(--muted); margin-right: 8px; }
+  .terminal .log-err { color: var(--danger); }
+  .terminal .log-warn { color: var(--warn); }
+  .terminal .log-info { color: var(--accent2); }
+
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-track { background: var(--bg); }
+  .terminal::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  .data-table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(14,58,94,0.4);
+    color: var(--text);
+  }
+
+  .data-table tr:hover td { background: rgba(0,212,255,0.04); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .badge-benign { background: rgba(0,255,153,0.15); color: var(--accent2); border: 1px solid rgba(0,255,153,0.3); }
+  .badge-attack { background: rgba(255,51,102,0.15); color: var(--danger); border: 1px solid rgba(255,51,102,0.3); }
+  .badge-warn { background: rgba(255,170,0,0.15); color: var(--warn); border: 1px solid rgba(255,170,0,0.3); }
+
+  /* METRIC ROW */
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(14,58,94,0.4);
+    font-size: 13px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-key { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .metric-val { font-family: var(--mono); color: var(--text); }
+
+  /* LOADING OVERLAY */
+  #loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(3,11,20,0.85);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 24px;
+    backdrop-filter: blur(4px);
+  }
+
+  #loading-overlay.show { display: flex; }
+
+  .spinner {
+    width: 60px;
+    height: 60px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-right-color: var(--accent2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loading-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    animation: blink 1.2s ease infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0.4; } }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    padding: 14px 24px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 360px;
+  }
+
+  #toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  #toast.success { background: var(--bg3); border: 1px solid var(--accent2); color: var(--accent2); }
+  #toast.error { background: var(--bg3); border: 1px solid var(--danger); color: var(--danger); }
+
+  /* CONFUSION MATRIX */
+  .cm-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    min-width: 52px;
+    min-height: 52px;
+    font-family: var(--mono);
+    font-size: 14px;
+    border-radius: 2px;
+  }
+
+  /* CHART CONTAINER */
+  .chart-container { position: relative; height: 260px; }
+
+  /* ALERT FEED */
+  .alert-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(14,58,94,0.4);
+  }
+
+  .alert-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .alert-icon.attack { background: rgba(255,51,102,0.2); }
+  .alert-icon.benign { background: rgba(0,255,153,0.1); }
+
+  /* RESPONSIVE */
+  @media (max-width: 1100px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 768px) {
+    main { padding: 16px; }
+    header { padding: 12px 16px; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    nav { padding: 0 16px; overflow-x: auto; }
+  }
+
+  .section-gap { display: flex; flex-direction: column; gap: 24px; }
+
+  .overflow-table { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+  .overflow-table::-webkit-scrollbar { width: 4px; height: 4px; }
+  .overflow-table::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .tag-portscan { color: #ff9933; }
+  .tag-ddos { color: var(--danger); }
+  .tag-botnet { color: #cc66ff; }
+  .tag-benign { color: var(--accent2); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+
+  .glow { box-shadow: 0 0 20px rgba(0,212,255,0.15); }
+
+  /* file info strip */
+  .file-strip {
+    display: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .file-strip.show { display: flex; }
+
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+      </div>
+      <div>
+        <h1>Sentinel IDS</h1>
+        <p>NETWORK INTRUSION DETECTION SYSTEM</p>
+      </div>
+    </div>
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="dot" id="model-dot"></div>
+        <span id="model-status-text">MODEL OFFLINE</span>
+      </div>
+      <div class="status-item">
+        <div class="dot active"></div>
+        <span>SYSTEM ONLINE</span>
+      </div>
+      <div class="status-item" id="clock" style="font-size:13px; color: var(--text)"></div>
+    </div>
+  </header>
+
+  <!-- NAV -->
+  <nav>
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="train">Train Model</button>
+    <button class="tab-btn" data-tab="detect">Detect Threats</button>
+    <button class="tab-btn" data-tab="results">Analysis</button>
+  </nav>
+
+  <main>
+
+    <!-- ═══════════ DASHBOARD ═══════════ -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div class="section-gap">
+
+        <div class="grid-4">
+          <div class="stat-card">
+            <div class="stat-val accent" id="dash-accuracy">—</div>
+            <div class="stat-label">Model Accuracy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val success" id="dash-benign">—</div>
+            <div class="stat-label">Benign Flows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val danger" id="dash-attacks">—</div>
+            <div class="stat-label">Attack Flows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val warn" id="dash-classes">—</div>
+            <div class="stat-label">Threat Classes</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-title">Threat Distribution</div>
+            <div class="chart-container">
+              <canvas id="chart-dist"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Top Features (Importance)</div>
+            <div class="chart-container">
+              <canvas id="chart-importance"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">System Log</div>
+          <div class="terminal" id="log-terminal">
+            <span class="log-line"><span class="log-time">[BOOT]</span> <span class="log-info">SENTINEL IDS v2.0 initialized</span></span>
+            <span class="log-line"><span class="log-time">[SYS]</span>  Awaiting model training...</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════ TRAIN ═══════════ -->
+    <div class="tab-panel" id="tab-train">
+      <div class="section-gap">
+
+        <div class="panel">
+          <div class="panel-title">Upload Training Dataset</div>
+          <div class="upload-zone" id="train-drop">
+            <input type="file" id="train-file" accept=".csv">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+            </div>
+            <h3>Drop CSV File Here</h3>
+            <p>CICIDS 2017 format — supports PortScan, DDoS, Botnet</p>
+          </div>
+          <div class="file-strip" id="train-file-strip">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="train-file-name">—</span>
+            <span style="color:var(--muted)" id="train-file-size"></span>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; align-items:center;">
+          <button class="btn btn-primary" id="btn-train">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Start Training
+          </button>
+          <span style="font-family:var(--mono); font-size:12px; color:var(--muted)" id="train-status-msg"></span>
+        </div>
+
+        <div class="panel" id="train-progress-panel" style="display:none">
+          <div class="panel-title">Training Progress</div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div>
+              <div style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:6px;">
+                <span id="progress-label">Preprocessing...</span>
+                <span id="progress-pct">0%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESULTS after training -->
+        <div id="train-results" style="display:none">
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-title">Model Metrics</div>
+              <div id="metrics-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Class Distribution</div>
+              <div class="chart-container"><canvas id="chart-class-dist"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Label Map</div>
+              <div id="label-map-list"></div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:24px">
+            <div class="panel-title">Confusion Matrix</div>
+            <div id="confusion-matrix" style="overflow-x:auto; padding:8px 0;"></div>
+          </div>
+
+          <div class="panel" style="margin-top:24px">
+            <div class="panel-title">Top 15 Feature Importance</div>
+            <div class="chart-container" style="height:340px;"><canvas id="chart-feat-importance"></canvas></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════ DETECT ═══════════ -->
+    <div class="tab-panel" id="tab-detect">
+      <div class="section-gap">
+
+        <div class="panel" id="detect-locked" style="display:none">
+          <div class="empty-state">
+            <div class="icon">🔒</div>
+            <p>Train a model first before running detection</p>
+            <br>
+            <button class="btn" onclick="switchTab('train')">Go to Training</button>
+          </div>
+        </div>
+
+        <div id="detect-content">
+          <div class="panel">
+            <div class="panel-title">Upload Detection Dataset</div>
+            <div class="upload-zone" id="detect-drop">
+              <input type="file" id="detect-file" accept=".csv">
+              <div class="upload-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+              </div>
+              <h3>Drop CSV for Detection</h3>
+              <p>Upload network traffic data to classify threats</p>
+            </div>
+            <div class="file-strip" id="detect-file-strip">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span id="detect-file-name">—</span>
+              <span style="color:var(--muted)" id="detect-file-size"></span>
+            </div>
+          </div>
+
+          <button class="btn btn-danger" id="btn-detect">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+            Run Threat Detection
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════ RESULTS / ANALYSIS ═══════════ -->
+    <div class="tab-panel" id="tab-results">
+      <div class="section-gap">
+
+        <div id="results-empty" class="panel">
+          <div class="empty-state">
+            <div class="icon">📡</div>
+            <p>No detection results yet. Run a scan from the Detect tab.</p>
+          </div>
+        </div>
+
+        <div id="results-content" style="display:none">
+          <div class="grid-4">
+            <div class="stat-card">
+              <div class="stat-val accent" id="res-total">—</div>
+              <div class="stat-label">Total Flows</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val success" id="res-benign">—</div>
+              <div class="stat-label">Benign</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val danger" id="res-attacks">—</div>
+              <div class="stat-label">Attacks</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val warn" id="res-rate">—</div>
+              <div class="stat-label">Attack Rate</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title">Detection Breakdown</div>
+              <div class="chart-container"><canvas id="chart-pred-dist"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Top Attackers by IP</div>
+              <div class="overflow-table">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Source IP</th><th>Flow Count</th><th>Threat Level</th></tr></thead>
+                  <tbody id="attacker-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">Attack Flow Sample (Top 50)</div>
+            <div class="overflow-table">
+              <table class="data-table" id="attack-sample-table">
+                <thead><tr><th>Source IP</th><th>Predicted Class</th><th>Flow Bytes/s</th></tr></thead>
+                <tbody id="attack-sample-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div id="loading-text">PROCESSING...</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── CLOCK ────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── TABS ─────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ─── LOG ──────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const t = document.getElementById('log-terminal');
+  const time = new Date().toTimeString().slice(0,8);
+  const cls = type === 'err' ? 'log-err' : type === 'warn' ? 'log-warn' : 'log-info';
+  t.innerHTML += `<span class="log-line"><span class="log-time">[${time}]</span> <span class="${cls}">${msg}</span></span>\n`;
+  t.scrollTop = t.scrollHeight;
+}
+
+// ─── TOAST ────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ─── LOADING ──────────────────────────────────────────
+function showLoading(msg = 'PROCESSING...') {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
+// ─── FILE INPUTS ──────────────────────────────────────
+function setupFileInput(inputId, stripId, nameId, sizeId) {
+  const input = document.getElementById(inputId);
+  input.addEventListener('change', () => {
+    const f = input.files[0];
+    if (!f) return;
+    const strip = document.getElementById(stripId);
+    document.getElementById(nameId).textContent = f.name;
+    document.getElementById(sizeId).textContent = formatSize(f.size);
+    strip.classList.add('show');
+  });
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+
+setupFileInput('train-file', 'train-file-strip', 'train-file-name', 'train-file-size');
+setupFileInput('detect-file', 'detect-file-strip', 'detect-file-name', 'detect-file-size');
+
+// Drag and drop styling
+['train-drop', 'detect-drop'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('dragover'); });
+  el.addEventListener('dragleave', () => el.classList.remove('dragover'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('dragover'); });
+});
+
+// ─── CHART REGISTRY ───────────────────────────────────
+const charts = {};
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+const COLORS = ['#00d4ff','#ff3366','#00ff99','#ffaa00','#cc66ff','#ff6633','#33ccff','#99ff33'];
+
+// ─── TRAIN ────────────────────────────────────────────
+let trainProgress = 0;
+let progressTimer = null;
+
+function fakeProgress(targetPct, label) {
+  clearInterval(progressTimer);
+  document.getElementById('progress-label').textContent = label;
+  document.getElementById('train-progress-panel').style.display = 'block';
+  progressTimer = setInterval(() => {
+    if (trainProgress >= targetPct) { clearInterval(progressTimer); return; }
+    trainProgress = Math.min(trainProgress + 1, targetPct);
+    document.getElementById('progress-fill').style.width = trainProgress + '%';
+    document.getElementById('progress-pct').textContent = trainProgress + '%';
+  }, 30);
+}
+
+document.getElementById('btn-train').addEventListener('click', async () => {
+  const file = document.getElementById('train-file').files[0];
+  if (!file) { showToast('Select a CSV file first', 'error'); return; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  showLoading('TRAINING MODEL...');
+  log('Starting model training: ' + file.name);
+  trainProgress = 0;
+
+  fakeProgress(30, 'Loading & preprocessing data...');
+  document.getElementById('train-status-msg').textContent = '';
+
+  try {
+    fakeProgress(60, 'Feature engineering & encoding...');
+
+    const res = await fetch('/train', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    hideLoading();
+    clearInterval(progressTimer);
+    trainProgress = 100;
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('progress-pct').textContent = '100%';
+    document.getElementById('progress-label').textContent = 'Training complete!';
+
+    if (data.error) throw new Error(data.error);
+
+    renderTrainResults(data);
+    updateModelStatus(true, data.metrics.accuracy);
+    showToast('✓ Model trained successfully!');
+    log('Training complete — Accuracy: ' + (data.metrics.accuracy * 100).toFixed(2) + '%');
+
+    document.getElementById('detect-locked').style.display = 'none';
+    document.getElementById('detect-content').style.display = 'block';
+
+  } catch (e) {
+    hideLoading();
+    showToast(e.message, 'error');
+    log('Training error: ' + e.message, 'err');
+  }
+});
+
+function renderTrainResults(data) {
+  document.getElementById('train-results').style.display = 'block';
+  const m = data.metrics;
+
+  // Metrics list
+  const ml = document.getElementById('metrics-list');
+  ml.innerHTML = `
+    <div class="metric-row"><span class="metric-key">ACCURACY</span><span class="metric-val" style="color:var(--accent2)">${(m.accuracy*100).toFixed(2)}%</span></div>
+    <div class="metric-row"><span class="metric-key">SAMPLES</span><span class="metric-val">${m.n_samples.toLocaleString()}</span></div>
+    <div class="metric-row"><span class="metric-key">FEATURES</span><span class="metric-val">${m.n_features}</span></div>
+    <div class="metric-row"><span class="metric-key">CLASSES</span><span class="metric-val">${Object.keys(m.class_distribution).length}</span></div>
+  `;
+
+  // Class distribution chart
+  const labels = Object.keys(m.class_distribution);
+  const vals = Object.values(m.class_distribution);
+  destroyChart('class-dist');
+  charts['class-dist'] = new Chart(document.getElementById('chart-class-dist'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: COLORS, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#c8e8f8', font: { family: 'Share Tech Mono', size: 11 } } }
+      }
+    }
+  });
+
+  // Label map
+  const lml = document.getElementById('label-map-list');
+  lml.innerHTML = Object.entries(data.label_map).map(([k,v]) =>
+    `<div class="metric-row"><span class="metric-key">CLASS ${k}</span><span class="metric-val">${v}</span></div>`
+  ).join('');
+
+  // Confusion matrix
+  renderConfusionMatrix(m.confusion_matrix, m.cm_labels);
+
+  // Feature importance
+  renderFeatureImportance(data.importance);
+
+  // Update dashboard charts
+  updateDashCharts(m.class_distribution, data.importance);
+  document.getElementById('dash-accuracy').textContent = (m.accuracy*100).toFixed(1) + '%';
+  document.getElementById('dash-classes').textContent = Object.keys(m.class_distribution).length;
+}
+
+function renderConfusionMatrix(cm, labels) {
+  const el = document.getElementById('confusion-matrix');
+  const maxVal = Math.max(...cm.flat());
+
+  let html = `<table style="border-collapse:collapse; font-family:var(--mono); font-size:12px;">`;
+  html += `<tr><td style="padding:6px; color:var(--muted)">A↓ P→</td>`;
+  labels.forEach(l => {
+    html += `<td style="padding:6px 10px; color:var(--muted); white-space:nowrap; font-size:11px">${l.slice(0,12)}</td>`;
+  });
+  html += `</tr>`;
+
+  cm.forEach((row, i) => {
+    html += `<tr><td style="padding:6px 10px; color:var(--muted); white-space:nowrap; font-size:11px">${labels[i].slice(0,12)}</td>`;
+    row.forEach((val, j) => {
+      const intensity = maxVal > 0 ? val/maxVal : 0;
+      const bg = i === j
+        ? `rgba(0,255,153,${Math.max(0.1, intensity * 0.6)})`
+        : val > 0 ? `rgba(255,51,102,${Math.max(0.05, intensity * 0.6)})` : 'transparent';
+      const color = i === j ? 'var(--accent2)' : val > 0 ? 'var(--danger)' : 'var(--muted)';
+      html += `<td style="padding:4px; text-align:center;"><div class="cm-cell" style="background:${bg}; color:${color}">${val}</div></td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</table>`;
+  el.innerHTML = html;
+}
+
+function renderFeatureImportance(importance) {
+  const labels = importance.map(x => x.Feature.slice(0,22));
+  const vals = importance.map(x => x.Importance);
+  destroyChart('feat-importance');
+  charts['feat-importance'] = new Chart(document.getElementById('chart-feat-importance'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: COLORS[0], borderRadius: 2 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#4a7a9b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(14,58,94,0.4)' } },
+        y: { ticks: { color: '#c8e8f8', font: { family: 'Share Tech Mono', size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ─── DETECT ───────────────────────────────────────────
+document.getElementById('btn-detect').addEventListener('click', async () => {
+  const file = document.getElementById('detect-file').files[0];
+  if (!file) { showToast('Select a CSV file first', 'error'); return; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  showLoading('SCANNING TRAFFIC...');
+  log('Running detection on: ' + file.name);
+
+  try {
+    const res = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) throw new Error(data.error);
+
+    renderDetectResults(data);
+    switchTab('results');
+    showToast('✓ Detection complete!');
+    log(`Detection: ${data.attack_count} attacks found in ${data.total} flows`);
+
+  } catch (e) {
+    hideLoading();
+    showToast(e.message, 'error');
+    log('Detection error: ' + e.message, 'err');
+  }
+});
+
+function renderDetectResults(data) {
+  document.getElementById('results-empty').style.display = 'none';
+  document.getElementById('results-content').style.display = 'block';
+
+  document.getElementById('res-total').textContent = data.total.toLocaleString();
+  document.getElementById('res-benign').textContent = data.benign_count.toLocaleString();
+  document.getElementById('res-attacks').textContent = data.attack_count.toLocaleString();
+  const rate = data.total > 0 ? ((data.attack_count/data.total)*100).toFixed(1) : 0;
+  document.getElementById('res-rate').textContent = rate + '%';
+
+  // Dashboard update
+  document.getElementById('dash-benign').textContent = data.benign_count.toLocaleString();
+  document.getElementById('dash-attacks').textContent = data.attack_count.toLocaleString();
+
+  // Pie chart
+  const labels = Object.keys(data.summary);
+  const vals = Object.values(data.summary);
+  destroyChart('pred-dist');
+  charts['pred-dist'] = new Chart(document.getElementById('chart-pred-dist'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: COLORS, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#c8e8f8', font: { family: 'Share Tech Mono', size: 11 } } } }
+    }
+  });
+
+  // Attacker table
+  const tbody = document.getElementById('attacker-table');
+  tbody.innerHTML = data.top_attackers.map((a, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td style="color:var(--accent)">${a.IP || '—'}</td>
+      <td>${a.Count}</td>
+      <td><span class="badge badge-attack">HIGH</span></td>
+    </tr>
+  `).join('');
+
+  // Sample attacks
+  const sbody = document.getElementById('attack-sample-body');
+  sbody.innerHTML = data.sample_attacks.map(r => {
+    const ip = r['Src IP'] || r['Source IP'] || '—';
+    const cls = r['Predicted'] || '—';
+    const flow = r['Flow Byts/s'] || r['Flow Bytes/s'] || '—';
+    const isAttack = cls !== 'BENIGN';
+    return `<tr>
+      <td style="color:var(--accent)">${ip}</td>
+      <td><span class="badge ${isAttack ? 'badge-attack' : 'badge-benign'}">${cls}</span></td>
+      <td>${typeof flow === 'number' ? flow.toFixed(2) : flow}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── DASHBOARD CHARTS ─────────────────────────────────
+function updateDashCharts(classDist, importance) {
+  // Distribution
+  destroyChart('dist');
+  charts['dist'] = new Chart(document.getElementById('chart-dist'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(classDist),
+      datasets: [{
+        data: Object.values(classDist),
+        backgroundColor: COLORS,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#4a7a9b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#4a7a9b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(14,58,94,0.3)' } }
+      }
+    }
+  });
+
+  // Feature importance top 10
+  const top10 = importance.slice(0, 10);
+  destroyChart('importance');
+  charts['importance'] = new Chart(document.getElementById('chart-importance'), {
+    type: 'bar',
+    data: {
+      labels: top10.map(x => x.Feature.slice(0, 18)),
+      datasets: [{
+        data: top10.map(x => x.Importance),
+        backgroundColor: '#00d4ff',
+        borderRadius: 2
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#4a7a9b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(14,58,94,0.3)' } },
+        y: { ticks: { color: '#c8e8f8', font: { family: 'Share Tech Mono', size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ─── MODEL STATUS ─────────────────────────────────────
+function updateModelStatus(trained, accuracy) {
+  const dot = document.getElementById('model-dot');
+  const txt = document.getElementById('model-status-text');
+  if (trained) {
+    dot.className = 'dot active';
+    txt.textContent = `MODEL READY — ${(accuracy*100).toFixed(1)}% ACC`;
+    txt.style.color = 'var(--accent2)';
+  }
+}
+
+// Initial: check detect lock state
+document.getElementById('detect-locked').style.display = 'block';
+document.getElementById('detect-content').style.display = 'none';
+
+// Init: fetch model info if available
+fetch('/model_info').then(r => r.json()).then(d => {
+  if (d.trained) {
+    updateModelStatus(true, d.metrics.accuracy);
+    document.getElementById('detect-locked').style.display = 'none';
+    document.getElementById('detect-content').style.display = 'block';
+  }
+}).catch(() => {});
+</script>
+</body>
+</html>
